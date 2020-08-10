@@ -1,0 +1,57 @@
+name: CouchDB-Dump
+version: "1.0"
+author: Justin Guckes <justin.guckes@gmail.com>
+about: CouchDB-Dump Tool
+subcommands:
+  - import:
+      args:
+        - host:
+            help: The Host-URL
+            required: true
+            index: 1
+        - user:
+            help: The user to Login
+            required: true
+            index: 2
+        - password:
+            help: The password to Login
+            required: true
+            index: 3
+        - database:
+            help: The database
+            required: true
+            index: 4
+        - file:
+            help: The file to import from
+            required: true
+            index: 5
+        - protocol:
+            help: The protocol
+            takes_value: true
+            short: p
+  - export:
+      args:
+        - host:
+            help: The Host-URL
+            required: true
+            index: 1
+        - user:
+            help: The user to Login
+            required: true
+            index: 2
+        - password:
+            help: The password to Login
+            required: true
+            index: 3
+        - database:
+            help: The database
+            required: true
+            index: 4
+        - file:
+            help: The file to export to
+            required: true
+            index: 5
+        - protocol:
+            help: The protocol
+            takes_value: true
+            short: p
