@@ -1,5 +1,4 @@
 use super::CouchAction;
-use clap::ArgMatches;
 use serde_json::json;
 use std::fs;
 use std::process;
