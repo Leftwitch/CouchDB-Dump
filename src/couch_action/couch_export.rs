@@ -9,6 +9,7 @@ pub struct CouchExport {
     pub password: String,
     pub database: String,
     pub protocol: String,
+    pub port: String,
     pub file: String,
 }
 
@@ -21,8 +22,8 @@ impl CouchAction for CouchExport {
 
         let client = reqwest::Client::new();
         let url = format!(
-            "{}://{}/{}/_all_docs?include_docs=true",
-            self.protocol, self.host, self.database
+            "{}://{}:{}/{}/_all_docs?include_docs=true",
+            self.protocol, self.host, self.port, self.database
         );
         let mut res = client
             .get(&url)

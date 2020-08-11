@@ -29,6 +29,10 @@ subcommands:
             help: The protocol
             takes_value: true
             short: p
+        - port:
+            help: The port
+            takes_value: true
+            short: P
         - create:
             help: Create DB
             takes_value: false
@@ -59,3 +63,7 @@ subcommands:
             help: The protocol
             takes_value: true
             short: p
+        - port:
+            help: The port
+            takes_value: true
+            short: P

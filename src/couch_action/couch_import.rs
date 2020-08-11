@@ -8,6 +8,7 @@ pub struct CouchImport {
     pub password: String,
     pub database: String,
     pub protocol: String,
+    pub port: String,
     pub file: String,
     pub create: bool,
 }
@@ -36,8 +37,8 @@ impl CouchAction for CouchImport {
 
         let client = reqwest::Client::new();
         let url = format!(
-            "{}://{}/{}/_bulk_docs",
-            self.protocol, self.host, self.database
+            "{}://{}:{}/{}/_bulk_docs",
+            self.protocol, self.host, self.port, self.database
         );
         let mut res = client
             .post(&url)
@@ -61,7 +62,10 @@ impl CouchAction for CouchImport {
 impl CouchImport {
     fn create_db(&self) -> bool {
         let client = reqwest::Client::new();
-        let url = format!("{}://{}/{}", self.protocol, self.host, self.database);
+        let url = format!(
+            "{}://{}:{}/{}",
+            self.protocol, self.host, self.port, self.database
+        );
         let mut res = client
             .put(&url)
             .basic_auth(&self.user, Some(&self.password))

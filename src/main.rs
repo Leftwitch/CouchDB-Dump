@@ -17,14 +17,20 @@ fn main() {
         let user = matches.value_of("user").unwrap();
         let password = matches.value_of("password").unwrap();
         let database = matches.value_of("database").unwrap();
-        let protocol = matches.value_of("protocol").unwrap_or("http");
+        let port = matches.value_of("port").unwrap_or("5984");
+        let mut protocol = matches.value_of("protocol").unwrap_or("http");
+        if port == "443" {
+            protocol = "https";
+        }
         let create = matches.is_present("create");
+
         let import = CouchImport {
             host: host.to_string(),
             user: user.to_string(),
             password: password.to_string(),
             database: database.to_string(),
             protocol: protocol.to_string(),
+            port: port.to_string(),
             file: file.to_string(),
             create: create,
         };
@@ -37,13 +43,18 @@ fn main() {
         let user = matches.value_of("user").unwrap();
         let password = matches.value_of("password").unwrap();
         let database = matches.value_of("database").unwrap();
-        let protocol = matches.value_of("protocol").unwrap_or("http");
+        let port = matches.value_of("port").unwrap_or("5984");
+        let mut protocol = matches.value_of("protocol").unwrap_or("http");
+        if port == "443" {
+            protocol = "https";
+        }
         let export = CouchExport {
             host: host.to_string(),
             user: user.to_string(),
             password: password.to_string(),
             database: database.to_string(),
             protocol: protocol.to_string(),
+            port: port.to_string(),
             file: file.to_string(),
         };
         export.execute();
