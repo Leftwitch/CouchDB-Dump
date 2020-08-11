@@ -12,11 +12,39 @@ fn main() {
     let matches = App::from(yaml).get_matches();
 
     if let Some(matches) = matches.subcommand_matches("import") {
-        CouchImport::execute(matches);
+        let file = matches.value_of("file").unwrap();
+        let host = matches.value_of("host").unwrap();
+        let user = matches.value_of("user").unwrap();
+        let password = matches.value_of("password").unwrap();
+        let database = matches.value_of("database").unwrap();
+        let protocol = matches.value_of("protocol").unwrap_or("http");
+        let import = CouchImport {
+            host: host.to_string(),
+            user: user.to_string(),
+            password: password.to_string(),
+            database: database.to_string(),
+            protocol: protocol.to_string(),
+            file: file.to_string(),
+        };
+        import.execute();
     }
 
     if let Some(matches) = matches.subcommand_matches("export") {
-        CouchExport::execute(matches);
+        let file = matches.value_of("file").unwrap();
+        let host = matches.value_of("host").unwrap();
+        let user = matches.value_of("user").unwrap();
+        let password = matches.value_of("password").unwrap();
+        let database = matches.value_of("database").unwrap();
+        let protocol = matches.value_of("protocol").unwrap_or("http");
+        let export = CouchExport {
+            host: host.to_string(),
+            user: user.to_string(),
+            password: password.to_string(),
+            database: database.to_string(),
+            protocol: protocol.to_string(),
+            file: file.to_string(),
+        };
+        export.execute();
     }
     // Same as previous examples...
 }

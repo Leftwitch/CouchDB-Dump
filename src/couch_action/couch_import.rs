@@ -2,23 +2,23 @@ use super::CouchAction;
 use clap::ArgMatches;
 use serde_json::json;
 use std::fs;
-pub struct CouchImport;
+pub struct CouchImport {
+    pub host: String,
+    pub user: String,
+    pub password: String,
+    pub database: String,
+    pub protocol: String,
+    pub file: String,
+}
 
 impl CouchAction for CouchImport {
-    fn execute(matches: &ArgMatches) {
-        let file = matches.value_of("file").unwrap();
-        let host = matches.value_of("host").unwrap();
-        let user = matches.value_of("user").unwrap();
-        let password = matches.value_of("password").unwrap();
-        let database = matches.value_of("database").unwrap();
-        let protocol = matches.value_of("protocol").unwrap_or("http");
-
+    fn execute(&self) {
         println!(
             "IMPORT - HOST: {} USER: {} PW: {} FILE: {} ",
-            host, user, password, file
+            self.host, self.user, self.password, self.file
         );
 
-        let file = fs::File::open(file).expect("file should open read only");
+        let file = fs::File::open(&self.file).expect("file should open read only");
         let json: serde_json::Value =
             serde_json::from_reader(file).expect("file should be proper JSON");
         let docs = json
@@ -30,10 +30,13 @@ impl CouchAction for CouchImport {
         println!("Documents Read: {}", docs.len());
 
         let client = reqwest::Client::new();
-        let url = format!("{}://{}/{}/_bulk_docs", protocol, host, database);
+        let url = format!(
+            "{}://{}/{}/_bulk_docs",
+            self.protocol, self.host, self.database
+        );
         let mut res = client
             .post(&url)
-            .basic_auth(user, Some(password))
+            .basic_auth(&self.user, Some(&self.password))
             .json(&json!({"new_edits":false, "docs": docs }))
             .send()
             .expect("The CouchDB returned an error");

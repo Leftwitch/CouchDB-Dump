@@ -1,7 +1,7 @@
 use clap::ArgMatches;
 
 pub trait CouchAction {
-    fn execute(matches: &ArgMatches);
+    fn execute(&self);
 }
 
 pub mod couch_export;
