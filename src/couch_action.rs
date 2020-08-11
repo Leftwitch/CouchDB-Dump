@@ -1,5 +1,3 @@
-use clap::ArgMatches;
-
 pub trait CouchAction {
     fn execute(&self);
 }
