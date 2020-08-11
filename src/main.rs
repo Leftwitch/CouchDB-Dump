@@ -18,6 +18,7 @@ fn main() {
         let password = matches.value_of("password").unwrap();
         let database = matches.value_of("database").unwrap();
         let protocol = matches.value_of("protocol").unwrap_or("http");
+        let create = matches.is_present("create");
         let import = CouchImport {
             host: host.to_string(),
             user: user.to_string(),
@@ -25,6 +26,7 @@ fn main() {
             database: database.to_string(),
             protocol: protocol.to_string(),
             file: file.to_string(),
+            create: create,
         };
         import.execute();
     }

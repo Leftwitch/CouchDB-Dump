@@ -29,6 +29,10 @@ subcommands:
             help: The protocol
             takes_value: true
             short: p
+        - create:
+            help: Create DB
+            takes_value: false
+            short: c
   - export:
       args:
         - host:
