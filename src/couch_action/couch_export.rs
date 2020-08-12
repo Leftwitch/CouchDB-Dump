@@ -1,6 +1,7 @@
 use super::CouchAction;
 use crate::models::*;
-use indicatif::{ProgressBar, ProgressStyle};
+use crate::progress_style::ProgressStyles;
+use indicatif::ProgressBar;
 use serde_json::{json, Value};
 use std::{convert::TryInto, fs::File, io::Write};
 const CHUNK_SIZE: usize = 250;
@@ -21,15 +22,8 @@ impl CouchAction for CouchExport {
             self.host, self.user, self.password, self.file
         );
 
-        let spinner_style = ProgressStyle::default_spinner()
-            .tick_chars("⠁⠂⠄⡀⢀⠠⠐⠈ ")
-            .template("{prefix:.bold.dim} {spinner} {wide_msg}");
-        let progress_style = ProgressStyle::default_bar()
-            .template("{prefix:.bold.dim} {wide_msg}\n[{bar:70.cyan/blue}] {pos}/{len} ")
-            .progress_chars("#>-");
-
         let total_docs_progress = ProgressBar::new(1);
-        total_docs_progress.set_style(spinner_style.clone());
+        total_docs_progress.set_style(ProgressStyles::spinner_style().clone());
         total_docs_progress.set_prefix(&format!("[{}/3]", 1));
         total_docs_progress.set_message("Get total # of documents...");
         total_docs_progress.enable_steady_tick(100);
@@ -42,7 +36,7 @@ impl CouchAction for CouchExport {
         let mut all_docs: Vec<Value> = Vec::new();
 
         let export_progress = ProgressBar::new(total_docs.try_into().unwrap());
-        export_progress.set_style(progress_style.clone());
+        export_progress.set_style(ProgressStyles::progress_style().clone());
         export_progress.set_prefix(&format!("[{}/3]", 2));
         export_progress.set_message("Downloading...");
         for chunk in 0..(chunks + 1) {
@@ -86,7 +80,7 @@ impl CouchAction for CouchExport {
         let json = serde_json::to_string(&final_result).expect("Json Conversion Failed");
 
         let file_progress = ProgressBar::new(1);
-        file_progress.set_style(spinner_style.clone());
+        file_progress.set_style(ProgressStyles::spinner_style().clone());
         file_progress.set_prefix(&format!("[{}/3]", 3));
         file_progress.set_message("Writing file...");
         file_progress.enable_steady_tick(100);

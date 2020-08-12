@@ -1,5 +1,6 @@
 mod couch_action;
 mod models;
+mod progress_style;
 
 use clap::{load_yaml, App, ArgMatches};
 use couch_action::couch_export::CouchExport;
