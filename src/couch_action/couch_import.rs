@@ -1,7 +1,8 @@
 use super::CouchAction;
-use serde_json::json;
+use serde_json::{Value, json};
 use std::fs;
 use std::process;
+use std::thread;
 pub struct CouchImport {
     pub host: String,
     pub user: String,
@@ -12,6 +13,8 @@ pub struct CouchImport {
     pub file: String,
     pub create: bool,
 }
+
+const CHUNK_SIZE: usize = 50;
 
 impl CouchAction for CouchImport {
     fn execute(&self) {
@@ -35,27 +38,21 @@ impl CouchAction for CouchImport {
             process::exit(1);
         }
 
-        let client = reqwest::Client::new();
-        let url = format!(
-            "{}://{}:{}/{}/_bulk_docs",
-            self.protocol, self.host, self.port, self.database
-        );
-        let mut res = client
-            .post(&url)
-            .basic_auth(&self.user, Some(&self.password))
-            .json(&json!({"new_edits":false, "docs": docs }))
-            .send()
-            .expect("The CouchDB returned an error");
+        let chunks = docs.len() / CHUNK_SIZE;
 
-        if res.status() != 201 {
-            println!(
-                "Request failed with status code: {}, response: {}",
-                res.status(),
-                res.text().unwrap()
-            )
+        for i in 0..(chunks + 1) {
+            let lower_limit = i * CHUNK_SIZE;
+            let mut upper_limit = (i + 1) * CHUNK_SIZE;
+            if i == chunks {
+                upper_limit = docs.len();
+            }
+           let upload_docs = &docs[lower_limit..upper_limit];
+
+           self.upload_docs(&upload_docs.to_vec());
+           println!("{}/{} chunks inserted", i, chunks);
         }
 
-        println!("Documents Inserted: {}", docs.len());
+
     }
 }
 
@@ -80,5 +77,29 @@ impl CouchImport {
             );
         }
         res.status() == 201
+    }
+
+    fn upload_docs(&self, docs: &Vec<Value>) {
+        let client = reqwest::Client::new();
+        let url = format!(
+            "{}://{}:{}/{}/_bulk_docs",
+            self.protocol, self.host, self.port, self.database
+        );
+        let mut res = client
+            .post(&url)
+            .basic_auth(&self.user, Some(&self.password))
+            .json(&json!({"new_edits":false, "docs": docs }))
+            .send()
+            .expect("The CouchDB returned an error");
+
+        if res.status() != 201 {
+            println!(
+                "Request failed with status code: {}, response: {}",
+                res.status(),
+                res.text().unwrap()
+            )
+        }
+
+        println!("Documents Inserted: {}", docs.len());
     }
 }
