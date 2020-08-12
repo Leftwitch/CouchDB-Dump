@@ -13,3 +13,8 @@ pub struct Row {
     pub key: String,
     pub doc: serde_json::value::Value,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DB {
+    pub doc_count: usize,
+}
