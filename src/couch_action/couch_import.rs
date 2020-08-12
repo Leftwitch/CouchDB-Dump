@@ -1,8 +1,8 @@
 use super::CouchAction;
 use serde_json::{Value, json};
 use std::fs;
-use std::process;
-use std::thread;
+use std::{convert::TryInto, process};
+use indicatif::{ProgressBar, ProgressStyle};
 pub struct CouchImport {
     pub host: String,
     pub user: String,
@@ -22,7 +22,18 @@ impl CouchAction for CouchImport {
             "IMPORT - HOST: {} USER: {} PW: {} FILE: {} ",
             self.host, self.user, self.password, self.file
         );
+        let spinner_style = ProgressStyle::default_spinner()
+            .tick_chars("⠁⠂⠄⡀⢀⠠⠐⠈ ")
+            .template("{prefix:.bold.dim} {spinner} {wide_msg}");
+        let progress_style = ProgressStyle::default_bar()
+            .template("{prefix:.bold.dim} {wide_msg}\n[{bar:70.cyan/blue}] {pos}/{len} ")
+            .progress_chars("#>-");
 
+        let file_progress = ProgressBar::new(1);
+        file_progress.set_style(spinner_style.clone());
+        file_progress.set_prefix(&format!("[{}/2]", 1));
+        file_progress.set_message("Reading JSON...");
+        file_progress.enable_steady_tick(100);
         let file = fs::File::open(&self.file).expect("file should open read only");
         let json: serde_json::Value =
             serde_json::from_reader(file).expect("file should be proper JSON");
@@ -32,7 +43,7 @@ impl CouchAction for CouchImport {
             .as_array()
             .expect("Docs should not be null");
 
-        println!("Documents Read: {}", docs.len());
+        file_progress.finish_with_message("DONE");
 
         if self.create && !self.create_db() {
             process::exit(1);
@@ -40,6 +51,10 @@ impl CouchAction for CouchImport {
 
         let chunks = docs.len() / CHUNK_SIZE;
 
+        let import_progress = ProgressBar::new(docs.len().try_into().unwrap());
+        import_progress.set_style(progress_style.clone());
+        import_progress.set_prefix(&format!("[{}/2]", 2));
+        import_progress.set_message("Importing...");
         for i in 0..(chunks + 1) {
             let lower_limit = i * CHUNK_SIZE;
             let mut upper_limit = (i + 1) * CHUNK_SIZE;
@@ -49,8 +64,10 @@ impl CouchAction for CouchImport {
            let upload_docs = &docs[lower_limit..upper_limit];
 
            self.upload_docs(&upload_docs.to_vec());
-           println!("{}/{} chunks inserted", i, chunks);
+
+           import_progress.inc(CHUNK_SIZE.try_into().unwrap());
         }
+        import_progress.finish_with_message("Import done!");
 
 
     }
@@ -99,7 +116,5 @@ impl CouchImport {
                 res.text().unwrap()
             )
         }
-
-        println!("Documents Inserted: {}", docs.len());
     }
 }
