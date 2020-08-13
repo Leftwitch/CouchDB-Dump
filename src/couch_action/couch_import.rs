@@ -26,8 +26,8 @@ impl CouchAction for CouchImport {
 
         let file_progress = ProgressBar::new(1);
         file_progress.set_style(ProgressStyles::spinner_style().clone());
-        file_progress.set_prefix(&format!("[{}/2]", 1));
-        file_progress.set_message("Reading JSON...");
+        file_progress.set_prefix(&format!("[{}/{}]", 1, if self.create { 3 } else { 2 }));
+        file_progress.set_message("👀 Reading input file: ");
         file_progress.enable_steady_tick(100);
         let file = fs::File::open(&self.file).expect("file should open read only");
         let json: serde_json::Value =
@@ -38,7 +38,7 @@ impl CouchAction for CouchImport {
             .as_array()
             .expect("Docs should not be null");
 
-        file_progress.finish_with_message("DONE");
+        file_progress.finish_with_message(&format!("👀 Reading input file: {} ✔️", docs.len())[..]);
 
         if self.create && !self.create_db() {
             process::exit(1);
@@ -48,8 +48,12 @@ impl CouchAction for CouchImport {
 
         let import_progress = ProgressBar::new(docs.len().try_into().unwrap());
         import_progress.set_style(ProgressStyles::progress_style().clone());
-        import_progress.set_prefix(&format!("[{}/2]", 2));
-        import_progress.set_message("Importing...");
+        import_progress.set_prefix(&format!(
+            "[{}/{}]",
+            if self.create { 3 } else { 2 },
+            if self.create { 3 } else { 2 }
+        ));
+        import_progress.set_message("📤 Importing documents");
         for i in 0..(chunks + 1) {
             let lower_limit = i * CHUNK_SIZE;
             let mut upper_limit = (i + 1) * CHUNK_SIZE;
@@ -62,12 +66,17 @@ impl CouchAction for CouchImport {
 
             import_progress.inc(CHUNK_SIZE.try_into().unwrap());
         }
-        import_progress.finish_with_message("Import done!");
+        import_progress.finish_with_message("📤 Importing documents ✔️ ");
     }
 }
 
 impl CouchImport {
     fn create_db(&self) -> bool {
+        let create_progress = ProgressBar::new(1);
+        create_progress.set_style(ProgressStyles::spinner_style().clone());
+        create_progress.set_prefix(&format!("[{}/3]", 2));
+        create_progress.set_message("✨ Creating database");
+        create_progress.enable_steady_tick(100);
         let client = reqwest::Client::new();
         let url = format!(
             "{}://{}:{}/{}",
@@ -86,6 +95,8 @@ impl CouchImport {
                 res.text().unwrap()
             );
         }
+
+        create_progress.finish_with_message("✨ Creating database: ✔️");
         res.status() == 201
     }
 

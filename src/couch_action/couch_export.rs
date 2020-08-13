@@ -25,11 +25,12 @@ impl CouchAction for CouchExport {
         let total_docs_progress = ProgressBar::new(1);
         total_docs_progress.set_style(ProgressStyles::spinner_style().clone());
         total_docs_progress.set_prefix(&format!("[{}/3]", 1));
-        total_docs_progress.set_message("Get total # of documents...");
+        total_docs_progress.set_message("📄 Fetching Total documents: ");
         total_docs_progress.enable_steady_tick(100);
         let total_docs = self.get_total_docs();
 
-        total_docs_progress.finish_with_message(&format!("Total docs: {}", total_docs)[..]);
+        total_docs_progress
+            .finish_with_message(&format!("📄 Fetching Total documents: {} ✔️", total_docs)[..]);
 
         let chunks = total_docs / CHUNK_SIZE;
 
@@ -38,7 +39,7 @@ impl CouchAction for CouchExport {
         let export_progress = ProgressBar::new(total_docs.try_into().unwrap());
         export_progress.set_style(ProgressStyles::progress_style().clone());
         export_progress.set_prefix(&format!("[{}/3]", 2));
-        export_progress.set_message("Downloading...");
+        export_progress.set_message("📥 Downloading documents");
         for chunk in 0..(chunks + 1) {
             let offset = chunk * CHUNK_SIZE;
             let client = reqwest::Client::new();
@@ -74,7 +75,7 @@ impl CouchAction for CouchExport {
             export_progress.inc(CHUNK_SIZE.try_into().unwrap());
         }
 
-        export_progress.finish_with_message("Download done!");
+        export_progress.finish_with_message("📥 Download done ✔️ ");
 
         let final_result = json!({ "docs": all_docs });
         let json = serde_json::to_string(&final_result).expect("Json Conversion Failed");
@@ -82,10 +83,10 @@ impl CouchAction for CouchExport {
         let file_progress = ProgressBar::new(1);
         file_progress.set_style(ProgressStyles::spinner_style().clone());
         file_progress.set_prefix(&format!("[{}/3]", 3));
-        file_progress.set_message("Writing file...");
+        file_progress.set_message("💾 Saving output file: ");
         file_progress.enable_steady_tick(100);
         self.write_file(json);
-        file_progress.finish_with_message("DONE");
+        file_progress.finish_with_message("💾 Saving output file: success ✔️");
     }
 }
 
