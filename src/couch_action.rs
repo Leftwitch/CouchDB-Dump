@@ -1,5 +1,8 @@
+use async_trait::async_trait;
+
+#[async_trait]
 pub trait CouchAction {
-    fn execute(&self);
+    async fn execute(&self);
 }
 
 pub mod couch_export;

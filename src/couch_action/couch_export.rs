@@ -3,7 +3,8 @@ use crate::models::*;
 use crate::progress_style::ProgressStyles;
 use indicatif::ProgressBar;
 use serde_json::{json, Value};
-use std::{convert::TryInto, fs::File, io::Write};
+use std::{convert::TryInto, fs::File, io::Write, process};
+use async_trait::async_trait;
 const CHUNK_SIZE: usize = 250;
 pub struct CouchExport {
     pub host: String,
@@ -15,8 +16,9 @@ pub struct CouchExport {
     pub file: String,
 }
 
+#[async_trait]
 impl CouchAction for CouchExport {
-    fn execute(&self) {
+    async fn execute(&self) {
         println!(
             "EXPORT - HOST: {} USER: {} PW: {} FILE: {} ",
             self.host, self.user, self.password, self.file
@@ -27,7 +29,12 @@ impl CouchAction for CouchExport {
         total_docs_progress.set_prefix(&format!("[{}/3]", 1));
         total_docs_progress.set_message("📄 Fetching Total documents: ");
         total_docs_progress.enable_steady_tick(100);
-        let total_docs = self.get_total_docs();
+        let total_docs: usize;
+        if let Ok(total) = self.get_total_docs().await {
+            total_docs = total;
+        } else {
+            process::exit(1);
+        }
 
         total_docs_progress
             .finish_with_message(&format!("📄 Fetching Total documents: {} ✔️", total_docs)[..]);
@@ -42,36 +49,9 @@ impl CouchAction for CouchExport {
         export_progress.set_message("📥 Downloading documents");
         for chunk in 0..(chunks + 1) {
             let offset = chunk * CHUNK_SIZE;
-            let client = reqwest::Client::new();
-            let url = format!(
-                "{}://{}:{}/{}/_all_docs?include_docs=true&limit={}&skip={}",
-                self.protocol, self.host, self.port, self.database, CHUNK_SIZE, offset
-            );
-            let mut res = client
-                .get(&url)
-                .basic_auth(&self.user, Some(&self.password))
-                .send()
-                .expect("The CouchDB returned an error");
-            if res.status() != 200 {
-                println!(
-                    "Request failed with status code: {}, response: {}",
-                    res.status(),
-                    res.text().unwrap()
-                )
+            if let Err(_) = self.download_docs(&mut all_docs, offset).await {
+                break;
             }
-
-            let docs: AllDocs = res
-                .json()
-                .expect("The Response returned by the CouchDB is not valid JSON");
-
-            let mut adjusted_docs: Vec<Value> = docs
-                .rows
-                .iter()
-                .to_owned()
-                .map(|row| row.doc.clone())
-                .collect::<Vec<serde_json::value::Value>>();
-
-            all_docs.append(&mut adjusted_docs);
             export_progress.inc(CHUNK_SIZE.try_into().unwrap());
         }
 
@@ -91,30 +71,58 @@ impl CouchAction for CouchExport {
 }
 
 impl CouchExport {
-    fn get_total_docs(&self) -> usize {
+    async fn get_total_docs(&self) -> Result<usize, Box<dyn std::error::Error>> {
         let client = reqwest::Client::new();
         let url = format!(
             "{}://{}:{}/{}",
             self.protocol, self.host, self.port, self.database
         );
-        let mut res = client
+        let res = client
             .get(&url)
             .basic_auth(&self.user, Some(&self.password))
             .send()
-            .expect("The CouchDB returned an error");
+            .await?;
 
-        if res.status() != 200 {
-            println!(
-                "Request failed with status code: {}, response: {}",
-                res.status(),
-                res.text().unwrap()
-            )
+        let success = res.status().is_success();
+        let body = res.text().await?;
+        if !success {
+            println!("Error accessing database: {}", body);
+            Err("Error accessing database")?
         }
-        let db: DB = res
-            .json()
-            .expect("The Response returned by the CouchDB is not valid JSON");
+        let db: DB = serde_json::from_str(&body[..])?;
+        Ok(db.doc_count)
+    }
 
-        db.doc_count
+    async fn download_docs(&self, all_docs: &mut Vec<Value>, offset: usize) -> Result<(), Box<dyn std::error::Error>> {
+        let client = reqwest::Client::new();
+        let url = format!(
+            "{}://{}:{}/{}/_all_docs?include_docs=true&limit={}&skip={}",
+            self.protocol, self.host, self.port, self.database, CHUNK_SIZE, offset
+        );
+        let res = client
+            .get(&url)
+            .basic_auth(&self.user, Some(&self.password))
+            .send()
+            .await?;
+
+        let success = res.status().is_success();
+        let body = res.text().await?;
+        if !success {
+            println!("Error downloading docs: {}", body);
+            Err("Error downloading docs")?
+        }
+
+        let docs: AllDocs = serde_json::from_str(&body[..])?;
+
+        let mut adjusted_docs: Vec<Value> = docs
+            .rows
+            .iter()
+            .to_owned()
+            .map(|row| row.doc.clone())
+            .collect::<Vec<serde_json::value::Value>>();
+
+        all_docs.append(&mut adjusted_docs);
+        Ok(())
     }
 
     fn write_file(&self, json: String) {

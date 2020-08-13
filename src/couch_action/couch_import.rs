@@ -1,5 +1,6 @@
 use super::CouchAction;
 use crate::progress_style::ProgressStyles;
+use async_trait::async_trait;
 use indicatif::ProgressBar;
 use serde_json::{json, Value};
 use std::fs;
@@ -17,8 +18,9 @@ pub struct CouchImport {
 
 const CHUNK_SIZE: usize = 50;
 
+#[async_trait]
 impl CouchAction for CouchImport {
-    fn execute(&self) {
+    async fn execute(&self) {
         println!(
             "IMPORT - HOST: {} USER: {} PW: {} FILE: {} ",
             self.host, self.user, self.password, self.file
@@ -40,8 +42,10 @@ impl CouchAction for CouchImport {
 
         file_progress.finish_with_message(&format!("👀 Reading input file: {} ✔️", docs.len())[..]);
 
-        if self.create && !self.create_db() {
-            process::exit(1);
+        if self.create {
+            if let Err(_) = self.create_db().await {
+                process::exit(1);
+            }
         }
 
         let chunks = docs.len() / CHUNK_SIZE;
@@ -61,9 +65,9 @@ impl CouchAction for CouchImport {
                 upper_limit = docs.len();
             }
             let upload_docs = &docs[lower_limit..upper_limit];
-
-            self.upload_docs(&upload_docs.to_vec());
-
+            if let Err(_) = self.upload_docs(&upload_docs.to_vec()).await {
+                break;
+            }
             import_progress.inc(CHUNK_SIZE.try_into().unwrap());
         }
         import_progress.finish_with_message("📤 Importing documents ✔️ ");
@@ -71,7 +75,7 @@ impl CouchAction for CouchImport {
 }
 
 impl CouchImport {
-    fn create_db(&self) -> bool {
+    async fn create_db(&self) -> Result<(), Box<dyn std::error::Error>> {
         let create_progress = ProgressBar::new(1);
         create_progress.set_style(ProgressStyles::spinner_style().clone());
         create_progress.set_prefix(&format!("[{}/3]", 2));
@@ -82,43 +86,37 @@ impl CouchImport {
             "{}://{}:{}/{}",
             self.protocol, self.host, self.port, self.database
         );
-        let mut res = client
+        let res = client
             .put(&url)
             .basic_auth(&self.user, Some(&self.password))
             .send()
-            .expect("The CouchDB returned an error");
+            .await?;
 
-        if res.status() != 201 {
-            println!(
-                "DB creation failed with status code: {}, response: {}",
-                res.status(),
-                res.text().unwrap()
-            );
+        if !res.status().is_success() {
+            println!("Error creating database: {}", res.text().await?);
+            Err("Error creating database")?
         }
-
         create_progress.finish_with_message("✨ Creating database: ✔️");
-        res.status() == 201
+        Ok(())
     }
 
-    fn upload_docs(&self, docs: &Vec<Value>) {
+    async fn upload_docs(&self, docs: &Vec<Value>) -> Result<(), Box<dyn std::error::Error>> {
         let client = reqwest::Client::new();
         let url = format!(
             "{}://{}:{}/{}/_bulk_docs",
             self.protocol, self.host, self.port, self.database
         );
-        let mut res = client
+        let res = client
             .post(&url)
             .basic_auth(&self.user, Some(&self.password))
             .json(&json!({"new_edits":false, "docs": docs }))
             .send()
-            .expect("The CouchDB returned an error");
+            .await?;
 
-        if res.status() != 201 {
-            println!(
-                "Request failed with status code: {}, response: {}",
-                res.status(),
-                res.text().unwrap()
-            )
+        if !res.status().is_success() {
+            println!("Error uploading docs: {}", res.text().await?);
+            Err("Error uploading docs")?
         }
+        Ok(())
     }
 }

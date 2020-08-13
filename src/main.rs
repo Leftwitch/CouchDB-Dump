@@ -7,7 +7,8 @@ use couch_action::couch_export::CouchExport;
 use couch_action::couch_import::CouchImport;
 use couch_action::CouchAction;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let yaml = load_yaml!("./cli.yaml");
     let matches = App::from(yaml).get_matches();
 
@@ -25,7 +26,7 @@ fn main() {
             file: file.to_string(),
             create: create,
         };
-        import.execute();
+        import.execute().await;
     }
 
     if let Some(matches) = matches.subcommand_matches("export") {
@@ -40,7 +41,7 @@ fn main() {
             port: port.to_string(),
             file: file.to_string(),
         };
-        export.execute();
+        export.execute().await;
     }
     // Same as previous examples...
 }
