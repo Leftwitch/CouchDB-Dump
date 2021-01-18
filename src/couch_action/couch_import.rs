@@ -3,8 +3,8 @@ use crate::progress_style::ProgressStyles;
 use async_trait::async_trait;
 use indicatif::ProgressBar;
 use serde_json::{json, Value};
-use std::fs;
 use std::{convert::TryInto, process};
+use std::{fs, io::Read};
 pub struct CouchImport {
     pub host: String,
     pub user: String,
@@ -31,9 +31,12 @@ impl CouchAction for CouchImport {
         file_progress.set_prefix(&format!("[{}/{}]", 1, if self.create { 3 } else { 2 }));
         file_progress.set_message("👀 Reading input file: ");
         file_progress.enable_steady_tick(100);
-        let file = fs::File::open(&self.file).expect("file should open read only");
+
+        let mut file = fs::File::open(&self.file).expect("file should open read only");
+        let mut bytes = Vec::new();
+        file.read_to_end(&mut bytes).unwrap();
         let json: serde_json::Value =
-            serde_json::from_reader(file).expect("file should be proper JSON");
+            serde_json::from_slice(&bytes).expect("file should be proper JSON");
         let docs = json
             .get("docs")
             .expect("Docs key not provided")
