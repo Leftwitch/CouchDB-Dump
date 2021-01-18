@@ -3,8 +3,9 @@ use crate::progress_style::ProgressStyles;
 use async_trait::async_trait;
 use indicatif::ProgressBar;
 use serde_json::{json, Value};
-use std::{convert::TryInto, process};
+use std::{cmp::min, convert::TryInto, error::Error, process, sync::Arc};
 use std::{fs, io::Read};
+use tokio::{runtime::Handle, task::JoinHandle};
 pub struct CouchImport {
     pub host: String,
     pub user: String,
@@ -41,7 +42,8 @@ impl CouchAction for CouchImport {
             .get("docs")
             .expect("Docs key not provided")
             .as_array()
-            .expect("Docs should not be null");
+            .expect("Docs should not be null")
+            .to_vec();
 
         file_progress.finish_with_message(&format!("👀 Reading input file: {} ✔️", docs.len())[..]);
 
@@ -61,17 +63,33 @@ impl CouchAction for CouchImport {
             if self.create { 3 } else { 2 }
         ));
         import_progress.set_message("📤 Importing documents");
+        let docs_len = docs.len();
         for i in 0..(chunks + 1) {
             let lower_limit = i * CHUNK_SIZE;
             let mut upper_limit = (i + 1) * CHUNK_SIZE;
             if i == chunks {
-                upper_limit = docs.len();
+                upper_limit = docs_len;
             }
-            let upload_docs = &docs[lower_limit..upper_limit];
-            if let Err(_) = self.upload_docs(&upload_docs.to_vec()).await {
-                break;
-            }
-            import_progress.inc(CHUNK_SIZE.try_into().unwrap());
+
+            let protocol = self.protocol.clone();
+            let host = self.host.clone();
+            let port = self.port.clone();
+            let db = self.database.clone();
+            let user = self.user.clone();
+            let pw = self.password.clone();
+
+            let cloned = import_progress.clone();
+
+            let docs = &docs[lower_limit..upper_limit];
+            let docs = docs.to_owned();
+
+            tokio::spawn(async move {
+                let rs = CouchImport::upload_docs(&docs, protocol, host, port, db, user, pw).await;
+
+                if rs.is_ok() {
+                    cloned.inc(docs.len().try_into().unwrap());
+                }
+            });
         }
         import_progress.finish_with_message("📤 Importing documents ✔️ ");
     }
@@ -103,15 +121,20 @@ impl CouchImport {
         Ok(())
     }
 
-    async fn upload_docs(&self, docs: &Vec<Value>) -> Result<(), Box<dyn std::error::Error>> {
+    async fn upload_docs(
+        docs: &[Value],
+        protocol: String,
+        host: String,
+        port: String,
+        database: String,
+        user: String,
+        password: String,
+    ) -> Result<(), Box<dyn Error + Send + Sync>> {
         let client = reqwest::Client::new();
-        let url = format!(
-            "{}://{}:{}/{}/_bulk_docs",
-            self.protocol, self.host, self.port, self.database
-        );
+        let url = format!("{}://{}:{}/{}/_bulk_docs", protocol, host, port, database);
         let res = client
             .post(&url)
-            .basic_auth(&self.user, Some(&self.password))
+            .basic_auth(user, Some(password))
             .json(&json!({"new_edits":false, "docs": docs }))
             .send()
             .await?;
