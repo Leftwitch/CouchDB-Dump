@@ -46,7 +46,8 @@ impl CouchAction for CouchImport {
         file_progress.finish_with_message(&format!("👀 Reading input file: {} ✔️", docs.len())[..]);
 
         if self.create {
-            if let Err(_) = self.create_db().await {
+            if let Err(err) = self.create_db().await {
+                println!("{:?}", err);
                 process::exit(1);
             }
         }
